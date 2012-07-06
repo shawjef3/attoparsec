@@ -92,6 +92,7 @@ module Data.Attoparsec.ByteString.Char8
     , Number(..)
     , number
     , rational
+    , dataDecimal
 
     -- * State observation and manipulation functions
     , I.endOfInput
@@ -105,6 +106,7 @@ import Data.Attoparsec.Combinator
 import Data.Attoparsec.Number (Number(..))
 import Data.Bits (Bits, (.|.), shiftL)
 import Data.ByteString.Internal (c2w, w2c)
+import Data.Decimal
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Ratio ((%))
 import Data.String (IsString(..))
@@ -408,7 +410,7 @@ signed p = (negate <$> (char8 '-' *> p))
 -- >rational "3.1"   == Done 3.1 ""
 -- >rational "3e4"   == Done 30000.0 ""
 -- >rational "3.1e4" == Done 31000.0, ""
---
+
 -- Examples with behaviour identical to 'read':
 --
 -- >rational ".3"    == Fail "input does not start with a digit"
@@ -501,3 +503,31 @@ floaty f = do
   return $ if positive
            then n
            else -n
+
+dataDecimal :: Parser Decimal
+dataDecimal = do
+  let minus = 45
+      plus  = 43
+  !positive <- ((== plus) <$> I.satisfy (\c -> c == minus || c == plus)) <|>
+               return True
+  wholePart <- decimal
+  let tryFraction = do
+        let dot = 46
+        _ <- I.satisfy (==dot)
+        ds <- I.takeWhile isDigit_w8
+        case I.parseOnly decimal ds of
+                Right n -> return (n, B.length ds)
+                _       -> fail "no digits after decimal"
+  (fracPart, fracDigits) <- tryFraction <|> return (0, 0)
+  let littleE = 101
+      bigE    = 69
+      e w = w == littleE || w == bigE
+  power <- (I.satisfy e *> signed decimal) <|> return (0::Int)
+  if fracDigits > 255
+    then fail "overflow Decimal"
+    else let n = (wholePart * (10 ^ fracDigits) + fracPart) * (10 ^ power)
+             nDec = Decimal (fromIntegral fracDigits) n
+         in return $ if positive
+                     then nDec
+                     else -nDec
+

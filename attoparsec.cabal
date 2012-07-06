@@ -1,4 +1,4 @@
-name:            attoparsec
+name:            attoparsec-decimal
 version:         0.10.1.1
 license:         BSD3
 license-file:    LICENSE
@@ -43,7 +43,8 @@ library
                  bytestring,
                  containers,
                  deepseq,
-                 text >= 0.11.1.5
+                 text >= 0.11.1.5,
+                 Decimal
 
   extensions:      CPP
   exposed-modules: Data.Attoparsec
